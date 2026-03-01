@@ -349,19 +349,16 @@ function seatOffset(table) {
 
 // ─── SVG rendering ───────────────────────────────────────────────────────────
 const SR = 14;  // seat radius (fixed)
-const SEAT_GAP = 8; // min gap between seat edges
 
-// Round table: radius so adjacent seat edges are SEAT_GAP apart
+// Scale linearly from the original 8-seat size (TR=52, TW=90, TH=60)
 function tableRadius(n) {
-  return Math.max(SR, (SR + SEAT_GAP / 2) / Math.sin(Math.PI / n) - SR - SEAT_GAP);
+  return Math.max(22, 6.5 * n);
 }
 
-// Rectangular table: 3:2 aspect, sized so seat pitch = 2*SR + SEAT_GAP
 function tableDims(n) {
-  const pitch = 2 * SR + SEAT_GAP;
   return {
-    TW: Math.max(36, n * pitch * 3 / 20),
-    TH: Math.max(24, n * pitch * 2 / 20),
+    TW: Math.max(45, 11.25 * n),
+    TH: Math.max(30, 7.5 * n),
   };
 }
 
@@ -370,13 +367,13 @@ function seatPos(table, i) {
   if (table.shape === 'round') {
     const TR = tableRadius(n);
     const angle = (2 * Math.PI * (i + 0.5) / n) - Math.PI / 2;
-    const r = TR + SR + SEAT_GAP;
+    const r = TR + SR + 8;
     return { x: table.x + r * Math.cos(angle), y: table.y + r * Math.sin(angle) };
   } else {
     const { TW, TH } = tableDims(n);
     const perim = 2 * (2*TW + 2*TH);
     const t = ((i + 0.5) / n) * perim;
-    const gap = SR + SEAT_GAP / 2;
+    const gap = SR + 4;
     const topLen = 2 * TW, rightLen = 2 * TH, botLen = 2 * TW, leftLen = 2 * TH;
 
     if (t < topLen) {

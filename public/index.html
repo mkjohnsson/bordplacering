@@ -585,7 +585,14 @@ function renderList() {
       btnM.className = 'toggle-btn' + (a.gender === 'M' ? ' active-m' : '');
       btnM.textContent = 'M';
       btnM.title = 'Man';
-      btnM.addEventListener('click', () => { const cur = getA(table.id, i); setA(table.id, i, { gender: cur.gender === 'M' ? '' : 'M' }); });
+      btnM.addEventListener('click', () => {
+        const cur = getA(table.id, i);
+        setA(table.id, i, { gender: cur.gender === 'M' ? '' : 'M' });
+        const next = getA(table.id, i);
+        btnM.className = 'toggle-btn' + (next.gender === 'M' ? ' active-m' : '');
+        btnK.className = 'toggle-btn' + (next.gender === 'K' ? ' active-k' : '');
+        numDiv.style.background = numCircleColor(next);
+      });
       row.appendChild(btnM);
 
       // Gender K button
@@ -593,7 +600,14 @@ function renderList() {
       btnK.className = 'toggle-btn' + (a.gender === 'K' ? ' active-k' : '');
       btnK.textContent = 'K';
       btnK.title = 'Kvinna';
-      btnK.addEventListener('click', () => { const cur = getA(table.id, i); setA(table.id, i, { gender: cur.gender === 'K' ? '' : 'K' }); });
+      btnK.addEventListener('click', () => {
+        const cur = getA(table.id, i);
+        setA(table.id, i, { gender: cur.gender === 'K' ? '' : 'K' });
+        const next = getA(table.id, i);
+        btnM.className = 'toggle-btn' + (next.gender === 'M' ? ' active-m' : '');
+        btnK.className = 'toggle-btn' + (next.gender === 'K' ? ' active-k' : '');
+        numDiv.style.background = numCircleColor(next);
+      });
       row.appendChild(btnK);
 
       // Special diet
@@ -601,7 +615,12 @@ function renderList() {
       btnS.className = 'toggle-btn' + (a.special ? ' active-s' : '');
       btnS.textContent = '★';
       btnS.title = 'Specialkost';
-      btnS.addEventListener('click', () => { const cur = getA(table.id, i); setA(table.id, i, { special: !cur.special }); });
+      btnS.addEventListener('click', () => {
+        const cur = getA(table.id, i);
+        setA(table.id, i, { special: !cur.special });
+        const next = getA(table.id, i);
+        btnS.className = 'toggle-btn' + (next.special ? ' active-s' : '');
+      });
       row.appendChild(btnS);
 
       list.appendChild(row);

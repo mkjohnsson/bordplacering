@@ -159,6 +159,7 @@
   <input id="event-name" type="text" placeholder="Evenemangets namn…" autocomplete="off">
   <button class="btn btn-ghost" onclick="document.getElementById('excel-input').click()">Importera Excel</button>
   <input id="excel-input" type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="importExcel(this)">
+  <button class="btn btn-primary" onclick="exportCards()">Exportera namnskyltar</button>
   <button class="btn btn-ghost" onclick="clearAll()">Rensa allt</button>
 </header>
 <div id="import-toast"></div>
@@ -732,6 +733,128 @@ function importExcel(input) {
     }
   };
   reader.readAsArrayBuffer(file);
+}
+
+// ─── Export name cards ───────────────────────────────────────────────────────
+function exportCards() {
+  if (!state.tables.length) { showToast('Inga bord att exportera.', 'err'); return; }
+
+  const eventName = state.eventName || 'Konferens';
+  let cards = '';
+  let globalSeat = 0;
+
+  for (const table of state.tables) {
+    for (let i = 0; i < table.seats; i++) {
+      globalSeat++;
+      const a = getA(table.id, i);
+      const name = (a.name || '').trim();
+
+      cards += `<div class="card">
+  <div class="top-bar"></div>
+  ${name
+    ? `<div class="card-name">${escHtml(name.toUpperCase())}</div>
+  <div class="divider"></div>
+  ${a.special ? `<div class="card-diet">★&nbsp;&nbsp;Specialkost</div>` : ''}`
+    : `<div class="card-name empty">PLATS ${globalSeat}</div>
+  <div class="divider"></div>`}
+  <div class="card-footer">
+    <span class="card-table">${escHtml(table.name.toUpperCase())}</span>
+    <span class="card-seat">${globalSeat}</span>
+  </div>
+</div>`;
+    }
+  }
+
+  const total = globalSeat;
+  const named = Object.values(state.assignments).filter(a => a.name && a.name.trim()).length;
+
+  const html = `<!DOCTYPE html>
+<html lang="sv"><head>
+<meta charset="UTF-8">
+<title>Namnskyltar — ${escHtml(eventName)}</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif; background:#1a1a2e; padding:10mm; }
+
+.screen-header {
+  display:flex; justify-content:space-between; align-items:center;
+  margin-bottom:8mm; color:#64748b; font-size:8.5pt;
+}
+.print-btn {
+  background:#3b82f6; color:#fff; border:none; padding:7px 18px;
+  border-radius:5px; cursor:pointer; font-size:9pt; font-weight:600;
+  letter-spacing:0.03em;
+}
+.print-btn:hover { background:#2563eb; }
+
+.cards-grid {
+  display:flex; flex-wrap:wrap; gap:7mm;
+}
+
+/* ── The card ── */
+.card {
+  width:10cm; height:7cm;
+  background:#17233d;
+  border-radius:4px; overflow:hidden; position:relative;
+  padding:15mm 13mm 11mm;
+  page-break-inside:avoid; break-inside:avoid;
+}
+.top-bar {
+  position:absolute; top:0; left:0; right:0; height:8.5mm;
+  background:#0d1729;
+}
+/* subtle gold edge glow */
+.card::after {
+  content:''; position:absolute; inset:0;
+  border:1px solid rgba(201,168,76,0.18); border-radius:4px; pointer-events:none;
+}
+
+.card-name {
+  font-size:14.5pt; font-weight:700; color:#fff;
+  letter-spacing:0.06em; line-height:1.25;
+  margin-bottom:3.5mm;
+}
+.card-name.empty { opacity:0.2; font-size:9pt; letter-spacing:0.15em; }
+
+.divider {
+  height:1.5px;
+  background:linear-gradient(to right, #c9a84c 55%, transparent);
+  margin-bottom:3mm;
+}
+
+.card-diet {
+  font-size:7pt; color:#c9a84c; letter-spacing:0.06em;
+}
+
+.card-footer {
+  position:absolute; bottom:9mm; left:13mm; right:13mm;
+  display:flex; justify-content:space-between; align-items:baseline;
+}
+.card-table {
+  font-size:6.5pt; color:#2d4060; letter-spacing:0.14em; font-weight:700;
+}
+.card-seat {
+  font-size:15pt; font-weight:700; color:#c9a84c; font-variant-numeric:tabular-nums;
+}
+
+@media print {
+  body { background:white; padding:8mm; }
+  .screen-header { display:none; }
+  @page { size:A4 landscape; margin:8mm; }
+}
+</style>
+</head><body>
+<div class="screen-header">
+  <span>${escHtml(eventName)}</span>
+  <button class="print-btn" onclick="window.print()">Skriv ut / Spara PDF</button>
+  <span>${named} av ${total} gäster namngivna</span>
+</div>
+<div class="cards-grid">${cards}</div>
+</body></html>`;
+
+  const win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
 }
 
 // ─── Full render ──────────────────────────────────────────────────────────────

@@ -2,7 +2,7 @@ name: Deploy to Pi
 
 on:
   push:
-    branches: [main]
+    branches: [master]
 
 jobs:
   deploy:
@@ -10,7 +10,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: main
+          ref: master
 
       - name: Install dependencies
         run: npm install --omit=dev

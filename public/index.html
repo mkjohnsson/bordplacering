@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bordplacering</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:-apple-system,'Segoe UI',sans-serif; background:#0f172a; color:#e2e8f0; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+
+    /* Header */
+    header {
+      display:flex; align-items:center; gap:1rem; padding:0.6rem 1rem;
+      background:#1e293b; border-bottom:1px solid #334155; flex-shrink:0;
+    }
+    header h1 { font-size:1rem; font-weight:600; flex:1; }
+    #event-name {
+      background:transparent; border:none; color:#e2e8f0; font-size:1rem; font-weight:600;
+      outline:none; min-width:160px;
+    }
+    #event-name::placeholder { color:#475569; }
+    .btn {
+      padding:0.35rem 0.75rem; border-radius:0.4rem; border:none; cursor:pointer;
+      font-size:0.8rem; font-weight:500; transition:background 0.15s;
+    }
+    .btn-primary { background:#3b82f6; color:#fff; }
+    .btn-primary:hover { background:#2563eb; }
+    .btn-ghost { background:#334155; color:#94a3b8; }
+    .btn-ghost:hover { background:#475569; color:#e2e8f0; }
+    .btn-danger { background:#7f1d1d; color:#fca5a5; }
+    .btn-danger:hover { background:#991b1b; }
+
+    /* Main layout */
+    main { display:flex; flex:1; min-height:0; }
+
+    /* Floor plan */
+    #floor-wrap {
+      flex:1; min-width:0; position:relative; overflow:hidden;
+      background:repeating-linear-gradient(0deg,transparent,transparent 39px,#1e293b44 39px,#1e293b44 40px),
+                 repeating-linear-gradient(90deg,transparent,transparent 39px,#1e293b44 39px,#1e293b44 40px);
+    }
+    #floor-svg { width:100%; height:100%; cursor:default; }
+
+    /* Sidebar */
+    #sidebar {
+      width:320px; flex-shrink:0; background:#1e293b; border-left:1px solid #334155;
+      display:flex; flex-direction:column; overflow:hidden;
+    }
+    #sidebar-header {
+      padding:0.75rem 1rem; border-bottom:1px solid #334155;
+      display:flex; align-items:center; justify-content:space-between; flex-shrink:0;
+    }
+    #sidebar-header span { font-size:0.75rem; color:#64748b; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; }
+    #seats-list { flex:1; overflow-y:auto; padding:0.5rem; }
+    #seats-list::-webkit-scrollbar { width:4px; }
+    #seats-list::-webkit-scrollbar-track { background:transparent; }
+    #seats-list::-webkit-scrollbar-thumb { background:#334155; border-radius:2px; }
+
+    /* Table group in list */
+    .tg-header {
+      display:flex; align-items:center; gap:0.5rem;
+      padding:0.5rem 0.5rem 0.25rem; margin-top:0.25rem;
+    }
+    .tg-name { font-size:0.72rem; font-weight:600; color:#94a3b8; text-transform:uppercase; letter-spacing:0.06em; flex:1; }
+    .tg-del { background:transparent; border:none; cursor:pointer; color:#475569; font-size:0.8rem; padding:2px 4px; border-radius:3px; }
+    .tg-del:hover { color:#f87171; background:#7f1d1d33; }
+
+    .seat-row {
+      display:flex; align-items:center; gap:0.4rem;
+      padding:0.25rem 0.5rem; border-radius:0.4rem;
+    }
+    .seat-row:hover { background:#0f172a44; }
+    .seat-num {
+      width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+      font-size:0.65rem; font-weight:700; flex-shrink:0; color:#0f172a;
+    }
+    .seat-name-input {
+      flex:1; background:#0f172a; border:1px solid #334155; border-radius:0.3rem;
+      color:#e2e8f0; font-size:0.78rem; padding:0.25rem 0.4rem; outline:none; min-width:0;
+    }
+    .seat-name-input:focus { border-color:#3b82f6; }
+    .seat-name-input::placeholder { color:#334155; }
+    .toggle-btn {
+      width:26px; height:22px; border-radius:3px; border:1px solid #334155; background:#0f172a;
+      color:#64748b; font-size:0.65rem; font-weight:700; cursor:pointer; flex-shrink:0;
+      display:flex; align-items:center; justify-content:center; transition:all 0.1s;
+    }
+    .toggle-btn:hover { border-color:#64748b; }
+    .toggle-btn.active-m { background:#1d4ed8; border-color:#3b82f6; color:#93c5fd; }
+    .toggle-btn.active-k { background:#9d174d; border-color:#ec4899; color:#f9a8d4; }
+    .toggle-btn.active-s { background:#92400e; border-color:#f59e0b; color:#fbbf24; }
+
+    /* Add table button in floor */
+    #add-table-btn {
+      position:absolute; bottom:1rem; left:1rem;
+      background:#1e293b; border:1px solid #334155; color:#94a3b8;
+      padding:0.5rem 1rem; border-radius:0.5rem; cursor:pointer; font-size:0.82rem;
+      display:flex; align-items:center; gap:0.4rem; transition:all 0.15s;
+    }
+    #add-table-btn:hover { background:#334155; color:#e2e8f0; }
+
+    /* Seat count badge on floor */
+    .floor-info {
+      position:absolute; bottom:1rem; right:0; left:auto;
+      padding:0.4rem 0.75rem; font-size:0.72rem; color:#475569;
+    }
+
+    /* Modal */
+    #modal-overlay {
+      position:fixed; inset:0; background:#00000088; display:none;
+      align-items:center; justify-content:center; z-index:100;
+    }
+    #modal-overlay.open { display:flex; }
+    #modal {
+      background:#1e293b; border:1px solid #334155; border-radius:0.75rem;
+      padding:1.5rem; width:320px; display:flex; flex-direction:column; gap:1rem;
+    }
+    #modal h2 { font-size:0.95rem; font-weight:600; }
+    .field { display:flex; flex-direction:column; gap:0.3rem; }
+    .field label { font-size:0.72rem; color:#64748b; }
+    .field input, .field select {
+      background:#0f172a; border:1px solid #334155; border-radius:0.4rem;
+      color:#e2e8f0; padding:0.4rem 0.6rem; font-size:0.85rem; outline:none;
+    }
+    .field input:focus, .field select:focus { border-color:#3b82f6; }
+    .shape-btns { display:flex; gap:0.5rem; }
+    .shape-btn {
+      flex:1; padding:0.5rem; border-radius:0.4rem; border:1px solid #334155;
+      background:#0f172a; color:#64748b; cursor:pointer; font-size:0.82rem;
+      display:flex; align-items:center; justify-content:center; gap:0.4rem; transition:all 0.15s;
+    }
+    .shape-btn:hover { border-color:#64748b; color:#e2e8f0; }
+    .shape-btn.selected { border-color:#3b82f6; background:#1d4ed8; color:#fff; }
+    .modal-footer { display:flex; gap:0.5rem; justify-content:flex-end; margin-top:0.25rem; }
+
+    /* Empty state */
+    #empty-state {
+      position:absolute; inset:0; display:flex; flex-direction:column;
+      align-items:center; justify-content:center; gap:0.75rem; pointer-events:none;
+    }
+    #empty-state p { color:#334155; font-size:0.9rem; }
+    #empty-state span { font-size:2.5rem; }
+  </style>
+</head>
+<body>
+
+<header>
+  <input id="event-name" type="text" placeholder="Evenemangets namn…" autocomplete="off">
+  <button class="btn btn-ghost" onclick="clearAll()">Rensa allt</button>
+</header>
+
+<main>
+  <!-- Floor plan -->
+  <div id="floor-wrap">
+    <svg id="floor-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+    <div id="empty-state">
+      <span>🪑</span>
+      <p>Lägg till ett bord för att börja</p>
+    </div>
+    <button id="add-table-btn" onclick="openModal()">+ Lägg till bord</button>
+  </div>
+
+  <!-- Sidebar list -->
+  <div id="sidebar">
+    <div id="sidebar-header">
+      <span>Gästlista</span>
+      <span id="total-count" style="font-size:0.72rem;color:#475569"></span>
+    </div>
+    <div id="seats-list"></div>
+  </div>
+</main>
+
+<!-- Add table modal -->
+<div id="modal-overlay" onclick="e=>{ if(e.target===this) closeModal(); }">
+  <div id="modal" onclick="event.stopPropagation()">
+    <h2>Nytt bord</h2>
+    <div class="field">
+      <label>Bordsnamn (valfritt)</label>
+      <input id="m-name" type="text" placeholder="t.ex. Bord 1">
+    </div>
+    <div class="field">
+      <label>Form</label>
+      <div class="shape-btns">
+        <button class="shape-btn selected" id="shape-round" onclick="selectShape('round')">⬤ Runt</button>
+        <button class="shape-btn" id="shape-square" onclick="selectShape('square')">■ Kvadratiskt</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>Antal platser</label>
+      <input id="m-seats" type="number" min="2" max="30" value="8">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Avbryt</button>
+      <button class="btn btn-primary" onclick="addTable()">Lägg till</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── State ───────────────────────────────────────────────────────────────────
+const STORAGE_KEY = 'bordplacering_v1';
+let state = {
+  eventName: '',
+  tables: [],     // { id, name, shape, seats, x, y }
+  assignments: {} // "tableId-seatIndex": { name, gender, special }
+};
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) state = JSON.parse(raw);
+  } catch {}
+}
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+// ─── Event name ──────────────────────────────────────────────────────────────
+document.getElementById('event-name').addEventListener('input', e => {
+  state.eventName = e.target.value;
+  save();
+});
+
+// ─── Modal ───────────────────────────────────────────────────────────────────
+let selectedShape = 'round';
+
+function openModal() {
+  document.getElementById('m-name').value = '';
+  document.getElementById('m-seats').value = '8';
+  selectShape('round');
+  document.getElementById('modal-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('m-name').focus(), 50);
+}
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+}
+document.getElementById('modal-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal-overlay')) closeModal();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeModal();
+  if (e.key === 'Enter' && document.getElementById('modal-overlay').classList.contains('open')) addTable();
+});
+
+function selectShape(s) {
+  selectedShape = s;
+  document.getElementById('shape-round').classList.toggle('selected', s === 'round');
+  document.getElementById('shape-square').classList.toggle('selected', s === 'square');
+}
+
+function addTable() {
+  const name = document.getElementById('m-name').value.trim() ||
+    `Bord ${state.tables.length + 1}`;
+  const seats = Math.max(2, Math.min(30, parseInt(document.getElementById('m-seats').value) || 8));
+  const svg = document.getElementById('floor-svg');
+  const rect = svg.getBoundingClientRect();
+  const id = 't' + Date.now();
+  state.tables.push({
+    id, name,
+    shape: selectedShape,
+    seats,
+    x: 80 + Math.random() * Math.max(100, rect.width - 200),
+    y: 80 + Math.random() * Math.max(100, rect.height - 200),
+  });
+  save();
+  closeModal();
+  render();
+}
+
+function deleteTable(id) {
+  if (!confirm('Ta bort bordet?')) return;
+  state.tables = state.tables.filter(t => t.id !== id);
+  // Remove assignments for this table
+  Object.keys(state.assignments).forEach(k => {
+    if (k.startsWith(id + '-')) delete state.assignments[k];
+  });
+  save();
+  render();
+}
+
+function clearAll() {
+  if (!confirm('Rensa hela placeringen?')) return;
+  state.tables = [];
+  state.assignments = {};
+  save();
+  render();
+}
+
+// ─── Assignment helpers ───────────────────────────────────────────────────────
+function aKey(tableId, i) { return tableId + '-' + i; }
+function getA(tableId, i) { return state.assignments[aKey(tableId, i)] || { name:'', gender:'', special:false }; }
+function setA(tableId, i, patch) {
+  const k = aKey(tableId, i);
+  state.assignments[k] = { ...getA(tableId, i), ...patch };
+  save();
+  renderFloor(); // only re-render SVG, list keeps focus
+  updateTotalCount();
+}
+
+// ─── Colors ──────────────────────────────────────────────────────────────────
+function seatFill(a) {
+  if (a.special)        return '#92400e';
+  if (a.gender === 'M') return '#1e3a5f';
+  if (a.gender === 'K') return '#4a1942';
+  return '#1e293b';
+}
+function seatStroke(a) {
+  if (a.special)        return '#f59e0b';
+  if (a.gender === 'M') return '#3b82f6';
+  if (a.gender === 'K') return '#ec4899';
+  return '#475569';
+}
+function seatTextColor(a) {
+  if (a.special)        return '#fbbf24';
+  if (a.gender === 'M') return '#93c5fd';
+  if (a.gender === 'K') return '#f9a8d4';
+  return '#94a3b8';
+}
+function numCircleColor(a) {
+  if (a.special)        return '#fbbf24';
+  if (a.gender === 'M') return '#93c5fd';
+  if (a.gender === 'K') return '#f9a8d4';
+  return '#475569';
+}
+
+// ─── SVG rendering ───────────────────────────────────────────────────────────
+const TR = 52; // table radius (round)
+const TW = 90; // table half-width (square)
+const TH = 60; // table half-height (square)
+const SR = 14; // seat radius
+
+function seatPos(table, i) {
+  const n = table.seats;
+  if (table.shape === 'round') {
+    const angle = (2 * Math.PI * (i + 0.5) / n) - Math.PI / 2;
+    const r = TR + SR + 8;
+    return { x: table.x + r * Math.cos(angle), y: table.y + r * Math.sin(angle) };
+  } else {
+    // Distribute seats around the perimeter of the rectangle
+    // Parameterize perimeter: start at top-left, go clockwise
+    const perim = 2 * (2*TW + 2*TH);
+    const t = ((i + 0.5) / n) * perim;
+    const gap = SR + 4;
+    const topLen = 2 * TW, rightLen = 2 * TH, botLen = 2 * TW, leftLen = 2 * TH;
+
+    if (t < topLen) {
+      // Top side
+      const frac = t / topLen;
+      return { x: table.x - TW + frac * 2 * TW, y: table.y - TH - gap };
+    } else if (t < topLen + rightLen) {
+      // Right side
+      const frac = (t - topLen) / rightLen;
+      return { x: table.x + TW + gap, y: table.y - TH + frac * 2 * TH };
+    } else if (t < topLen + rightLen + botLen) {
+      // Bottom side
+      const frac = (t - topLen - rightLen) / botLen;
+      return { x: table.x + TW - frac * 2 * TW, y: table.y + TH + gap };
+    } else {
+      // Left side
+      const frac = (t - topLen - rightLen - botLen) / leftLen;
+      return { x: table.x - TW - gap, y: table.y + TH - frac * 2 * TH };
+    }
+  }
+}
+
+function makeSVGEl(tag, attrs) {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+  return el;
+}
+
+function renderFloor() {
+  const svg = document.getElementById('floor-svg');
+  svg.innerHTML = '';
+  document.getElementById('empty-state').style.display = state.tables.length ? 'none' : 'flex';
+
+  for (const table of state.tables) {
+    const g = makeSVGEl('g', { 'data-id': table.id, style: 'cursor:grab' });
+    g.addEventListener('mousedown', onTableMouseDown);
+
+    // Table body
+    if (table.shape === 'round') {
+      const circle = makeSVGEl('circle', { cx: table.x, cy: table.y, r: TR, fill: '#0f172a', stroke: '#334155', 'stroke-width': 2 });
+      g.appendChild(circle);
+    } else {
+      const rect = makeSVGEl('rect', {
+        x: table.x - TW, y: table.y - TH, width: 2*TW, height: 2*TH,
+        rx: 6, fill: '#0f172a', stroke: '#334155', 'stroke-width': 2
+      });
+      g.appendChild(rect);
+    }
+
+    // Table name
+    const label = makeSVGEl('text', {
+      x: table.x, y: table.y - 4,
+      'text-anchor': 'middle', fill: '#64748b',
+      'font-size': '11', 'font-family': '-apple-system,Segoe UI,sans-serif', 'font-weight': '600'
+    });
+    label.textContent = table.name;
+    g.appendChild(label);
+
+    const sublabel = makeSVGEl('text', {
+      x: table.x, y: table.y + 10,
+      'text-anchor': 'middle', fill: '#334155',
+      'font-size': '9.5', 'font-family': '-apple-system,Segoe UI,sans-serif'
+    });
+    sublabel.textContent = table.seats + ' platser';
+    g.appendChild(sublabel);
+
+    // Seats
+    for (let i = 0; i < table.seats; i++) {
+      const pos = seatPos(table, i);
+      const a = getA(table.id, i);
+
+      const sc = makeSVGEl('circle', {
+        cx: pos.x, cy: pos.y, r: SR,
+        fill: seatFill(a), stroke: seatStroke(a), 'stroke-width': 1.5
+      });
+      g.appendChild(sc);
+
+      // Seat number
+      const hasName = a.name && a.name.trim();
+      if (hasName) {
+        // Show shortened name
+        const dispName = a.name.trim().split(' ')[0].substring(0, 6);
+        const nt = makeSVGEl('text', {
+          x: pos.x, y: pos.y + 4,
+          'text-anchor': 'middle', fill: seatTextColor(a),
+          'font-size': '8', 'font-family': '-apple-system,Segoe UI,sans-serif', 'font-weight': '600',
+          'pointer-events': 'none'
+        });
+        nt.textContent = dispName;
+        g.appendChild(nt);
+      } else {
+        const nt = makeSVGEl('text', {
+          x: pos.x, y: pos.y + 4,
+          'text-anchor': 'middle', fill: '#334155',
+          'font-size': '9', 'font-family': '-apple-system,Segoe UI,sans-serif', 'font-weight': '700',
+          'pointer-events': 'none'
+        });
+        nt.textContent = i + 1;
+        g.appendChild(nt);
+      }
+    }
+
+    svg.appendChild(g);
+  }
+}
+
+// ─── Drag ────────────────────────────────────────────────────────────────────
+let dragging = null;
+
+function onTableMouseDown(e) {
+  if (e.button !== 0) return;
+  e.preventDefault();
+  const id = e.currentTarget.getAttribute('data-id');
+  const table = state.tables.find(t => t.id === id);
+  if (!table) return;
+  const svg = document.getElementById('floor-svg');
+  const rect = svg.getBoundingClientRect();
+  dragging = {
+    table,
+    startMX: e.clientX,
+    startMY: e.clientY,
+    startTX: table.x,
+    startTY: table.y,
+  };
+  e.currentTarget.style.cursor = 'grabbing';
+}
+
+document.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  dragging.table.x = dragging.startTX + (e.clientX - dragging.startMX);
+  dragging.table.y = dragging.startTY + (e.clientY - dragging.startMY);
+  renderFloor();
+});
+
+document.addEventListener('mouseup', () => {
+  if (!dragging) return;
+  save();
+  dragging = null;
+});
+
+// ─── List rendering ───────────────────────────────────────────────────────────
+function renderList() {
+  const list = document.getElementById('seats-list');
+  list.innerHTML = '';
+
+  for (const table of state.tables) {
+    // Table header
+    const header = document.createElement('div');
+    header.className = 'tg-header';
+    header.innerHTML = `
+      <span class="tg-name">${escHtml(table.name)}</span>
+      <button class="tg-del" title="Ta bort bord" onclick="deleteTable('${table.id}')">✕</button>
+    `;
+    list.appendChild(header);
+
+    // Seats
+    for (let i = 0; i < table.seats; i++) {
+      const a = getA(table.id, i);
+      const row = document.createElement('div');
+      row.className = 'seat-row';
+
+      const numDiv = document.createElement('div');
+      numDiv.className = 'seat-num';
+      numDiv.style.background = numCircleColor(a);
+      numDiv.style.color = '#0f172a';
+      numDiv.textContent = i + 1;
+      row.appendChild(numDiv);
+
+      const nameInput = document.createElement('input');
+      nameInput.className = 'seat-name-input';
+      nameInput.type = 'text';
+      nameInput.placeholder = 'Namn…';
+      nameInput.value = a.name || '';
+      nameInput.autocomplete = 'off';
+      nameInput.addEventListener('input', ev => setA(table.id, i, { name: ev.target.value }));
+      row.appendChild(nameInput);
+
+      // Gender M button
+      const btnM = document.createElement('button');
+      btnM.className = 'toggle-btn' + (a.gender === 'M' ? ' active-m' : '');
+      btnM.textContent = 'M';
+      btnM.title = 'Man';
+      btnM.addEventListener('click', () => setA(table.id, i, { gender: a.gender === 'M' ? '' : 'M' }));
+      row.appendChild(btnM);
+
+      // Gender K button
+      const btnK = document.createElement('button');
+      btnK.className = 'toggle-btn' + (a.gender === 'K' ? ' active-k' : '');
+      btnK.textContent = 'K';
+      btnK.title = 'Kvinna';
+      btnK.addEventListener('click', () => setA(table.id, i, { gender: a.gender === 'K' ? '' : 'K' }));
+      row.appendChild(btnK);
+
+      // Special diet
+      const btnS = document.createElement('button');
+      btnS.className = 'toggle-btn' + (a.special ? ' active-s' : '');
+      btnS.textContent = '★';
+      btnS.title = 'Specialkost';
+      btnS.addEventListener('click', () => setA(table.id, i, { special: !a.special }));
+      row.appendChild(btnS);
+
+      list.appendChild(row);
+    }
+  }
+  updateTotalCount();
+}
+
+function updateTotalCount() {
+  const total = state.tables.reduce((s, t) => s + t.seats, 0);
+  const named = Object.values(state.assignments).filter(a => a.name && a.name.trim()).length;
+  document.getElementById('total-count').textContent = named ? `${named} / ${total} placerade` : `${total} platser`;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ─── Full render ──────────────────────────────────────────────────────────────
+function render() {
+  renderFloor();
+  renderList();
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+load();
+document.getElementById('event-name').value = state.eventName || '';
+render();
+</script>
+</body>
+</html>

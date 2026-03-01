@@ -1,0 +1,23 @@
+name: Deploy to Pi
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, pi-bordplacering]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Install dependencies
+        run: npm ci --omit=dev
+
+      - name: Restart pm2
+        run: |
+          pm2 describe bordplacering > /dev/null 2>&1 \
+            && pm2 restart bordplacering \
+            || PORT=5009 pm2 start server.js --name bordplacering
+          pm2 save

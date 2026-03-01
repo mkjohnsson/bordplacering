@@ -348,39 +348,47 @@ function seatOffset(table) {
 }
 
 // ─── SVG rendering ───────────────────────────────────────────────────────────
-const TR = 52; // table radius (round)
-const TW = 90; // table half-width (square)
-const TH = 60; // table half-height (square)
-const SR = 14; // seat radius
+const SR = 14;  // seat radius (fixed)
+const SEAT_GAP = 8; // min gap between seat edges
+
+// Round table: radius so adjacent seat edges are SEAT_GAP apart
+function tableRadius(n) {
+  return Math.max(SR, (SR + SEAT_GAP / 2) / Math.sin(Math.PI / n) - SR - SEAT_GAP);
+}
+
+// Rectangular table: 3:2 aspect, sized so seat pitch = 2*SR + SEAT_GAP
+function tableDims(n) {
+  const pitch = 2 * SR + SEAT_GAP;
+  return {
+    TW: Math.max(36, n * pitch * 3 / 20),
+    TH: Math.max(24, n * pitch * 2 / 20),
+  };
+}
 
 function seatPos(table, i) {
   const n = table.seats;
   if (table.shape === 'round') {
+    const TR = tableRadius(n);
     const angle = (2 * Math.PI * (i + 0.5) / n) - Math.PI / 2;
-    const r = TR + SR + 8;
+    const r = TR + SR + SEAT_GAP;
     return { x: table.x + r * Math.cos(angle), y: table.y + r * Math.sin(angle) };
   } else {
-    // Distribute seats around the perimeter of the rectangle
-    // Parameterize perimeter: start at top-left, go clockwise
+    const { TW, TH } = tableDims(n);
     const perim = 2 * (2*TW + 2*TH);
     const t = ((i + 0.5) / n) * perim;
-    const gap = SR + 4;
+    const gap = SR + SEAT_GAP / 2;
     const topLen = 2 * TW, rightLen = 2 * TH, botLen = 2 * TW, leftLen = 2 * TH;
 
     if (t < topLen) {
-      // Top side
       const frac = t / topLen;
       return { x: table.x - TW + frac * 2 * TW, y: table.y - TH - gap };
     } else if (t < topLen + rightLen) {
-      // Right side
       const frac = (t - topLen) / rightLen;
       return { x: table.x + TW + gap, y: table.y - TH + frac * 2 * TH };
     } else if (t < topLen + rightLen + botLen) {
-      // Bottom side
       const frac = (t - topLen - rightLen) / botLen;
       return { x: table.x + TW - frac * 2 * TW, y: table.y + TH + gap };
     } else {
-      // Left side
       const frac = (t - topLen - rightLen - botLen) / leftLen;
       return { x: table.x - TW - gap, y: table.y + TH - frac * 2 * TH };
     }
@@ -404,9 +412,11 @@ function renderFloor() {
 
     // Table body
     if (table.shape === 'round') {
+      const TR = tableRadius(table.seats);
       const circle = makeSVGEl('circle', { cx: table.x, cy: table.y, r: TR, fill: '#0f172a', stroke: '#334155', 'stroke-width': 2 });
       g.appendChild(circle);
     } else {
+      const { TW, TH } = tableDims(table.seats);
       const rect = makeSVGEl('rect', {
         x: table.x - TW, y: table.y - TH, width: 2*TW, height: 2*TH,
         rx: 6, fill: '#0f172a', stroke: '#334155', 'stroke-width': 2

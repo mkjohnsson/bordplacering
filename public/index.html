@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bordplacering</title>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     body { font-family:-apple-system,'Segoe UI',sans-serif; background:#0f172a; color:#e2e8f0; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
@@ -133,6 +134,16 @@
     .shape-btn.selected { border-color:#3b82f6; background:#1d4ed8; color:#fff; }
     .modal-footer { display:flex; gap:0.5rem; justify-content:flex-end; margin-top:0.25rem; }
 
+    /* Import toast */
+    #import-toast {
+      position:fixed; bottom:1.25rem; left:50%; transform:translateX(-50%);
+      background:#1e293b; border:1px solid #334155; border-radius:0.5rem;
+      padding:0.5rem 1rem; font-size:0.8rem; color:#94a3b8;
+      display:none; z-index:200; white-space:nowrap;
+    }
+    #import-toast.ok  { border-color:#22c55e; color:#4ade80; }
+    #import-toast.err { border-color:#ef4444; color:#f87171; }
+
     /* Empty state */
     #empty-state {
       position:absolute; inset:0; display:flex; flex-direction:column;
@@ -146,8 +157,11 @@
 
 <header>
   <input id="event-name" type="text" placeholder="Evenemangets namn…" autocomplete="off">
+  <button class="btn btn-ghost" onclick="document.getElementById('excel-input').click()">Importera Excel</button>
+  <input id="excel-input" type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="importExcel(this)">
   <button class="btn btn-ghost" onclick="clearAll()">Rensa allt</button>
 </header>
+<div id="import-toast"></div>
 
 <main>
   <!-- Floor plan -->
@@ -568,6 +582,101 @@ function updateTotalCount() {
 
 function escHtml(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ─── Excel import ────────────────────────────────────────────────────────────
+// Maps global seat number (1-based) → { tableId, index }
+function seatNumberToRef(n) {
+  let offset = 0;
+  for (const t of state.tables) {
+    if (n <= offset + t.seats) return { tableId: t.id, index: n - offset - 1 };
+    offset += t.seats;
+  }
+  return null;
+}
+
+function showToast(msg, type = '') {
+  const el = document.getElementById('import-toast');
+  el.textContent = msg;
+  el.className = type;
+  el.style.display = 'block';
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => { el.style.display = 'none'; }, 4000);
+}
+
+function importExcel(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = ''; // allow re-importing same file
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+      if (!rows.length) { showToast('Filen är tom.', 'err'); return; }
+
+      // Detect header row — look for a row containing seat-number-like header
+      const SEAT_KEYS   = ['platsnummer','plats','nr','seat','#'];
+      const NAME_KEYS   = ['namn','name'];
+      const GENDER_KEYS = ['kön','kon','gender','sex'];
+      const DIET_KEYS   = ['kost','diet','specialkost','allergi','special'];
+
+      let colSeat = -1, colName = -1, colGender = -1, colDiet = -1;
+      let dataStart = 0;
+
+      const firstRow = rows[0].map(c => String(c).toLowerCase().trim());
+      const hasHeader = SEAT_KEYS.some(k => firstRow.includes(k)) ||
+                        NAME_KEYS.some(k => firstRow.includes(k));
+
+      if (hasHeader) {
+        colSeat   = firstRow.findIndex(c => SEAT_KEYS.includes(c));
+        colName   = firstRow.findIndex(c => NAME_KEYS.includes(c));
+        colGender = firstRow.findIndex(c => GENDER_KEYS.includes(c));
+        colDiet   = firstRow.findIndex(c => DIET_KEYS.includes(c));
+        dataStart = 1;
+        // Fallback: if seat column not found assume col 0
+        if (colSeat === -1) colSeat = 0;
+        if (colName === -1) colName = 1;
+      } else {
+        // No header — assume A=seat, B=name, C=gender, D=diet
+        colSeat = 0; colName = 1; colGender = 2; colDiet = 3;
+      }
+
+      let imported = 0, skipped = 0;
+      for (let r = dataStart; r < rows.length; r++) {
+        const row = rows[r];
+        const seatNum = parseInt(row[colSeat]);
+        if (!seatNum || isNaN(seatNum)) continue;
+
+        const ref = seatNumberToRef(seatNum);
+        if (!ref) { skipped++; continue; }
+
+        const name   = colName   >= 0 ? String(row[colName]   || '').trim() : '';
+        const rawGen = colGender >= 0 ? String(row[colGender] || '').trim().toUpperCase() : '';
+        const gender = rawGen === 'M' || rawGen === 'MAN' || rawGen === 'MALE'   ? 'M'
+                     : rawGen === 'K' || rawGen === 'KV'  || rawGen === 'KVINNA' ||
+                       rawGen === 'F' || rawGen === 'FEM' || rawGen === 'FEMALE' ? 'K' : '';
+        const rawDiet = colDiet >= 0 ? String(row[colDiet] || '').trim() : '';
+        const special = rawDiet !== '' && rawDiet !== '0' &&
+                        rawDiet.toLowerCase() !== 'nej' && rawDiet.toLowerCase() !== 'no';
+
+        state.assignments[aKey(ref.tableId, ref.index)] = { name, gender, special };
+        imported++;
+      }
+
+      save();
+      render();
+      const msg = skipped
+        ? `Importerade ${imported} gäster (${skipped} platsnr utanför bordsplanen ignorerades)`
+        : `Importerade ${imported} gäster`;
+      showToast(msg, 'ok');
+    } catch(err) {
+      showToast('Kunde inte läsa filen: ' + err.message, 'err');
+    }
+  };
+  reader.readAsArrayBuffer(file);
 }
 
 // ─── Full render ──────────────────────────────────────────────────────────────

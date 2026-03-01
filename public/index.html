@@ -323,6 +323,16 @@ function numCircleColor(a) {
   return '#475569';
 }
 
+// ─── Seat numbering ──────────────────────────────────────────────────────────
+function seatOffset(table) {
+  let offset = 0;
+  for (const t of state.tables) {
+    if (t.id === table.id) break;
+    offset += t.seats;
+  }
+  return offset;
+}
+
 // ─── SVG rendering ───────────────────────────────────────────────────────────
 const TR = 52; // table radius (round)
 const TW = 90; // table half-width (square)
@@ -408,6 +418,7 @@ function renderFloor() {
     g.appendChild(sublabel);
 
     // Seats
+    const offset = seatOffset(table);
     for (let i = 0; i < table.seats; i++) {
       const pos = seatPos(table, i);
       const a = getA(table.id, i);
@@ -438,7 +449,7 @@ function renderFloor() {
           'font-size': '9', 'font-family': '-apple-system,Segoe UI,sans-serif', 'font-weight': '700',
           'pointer-events': 'none'
         });
-        nt.textContent = i + 1;
+        nt.textContent = offset + i + 1;
         g.appendChild(nt);
       }
     }
@@ -497,6 +508,7 @@ function renderList() {
     list.appendChild(header);
 
     // Seats
+    const offset = seatOffset(table);
     for (let i = 0; i < table.seats; i++) {
       const a = getA(table.id, i);
       const row = document.createElement('div');
@@ -506,7 +518,7 @@ function renderList() {
       numDiv.className = 'seat-num';
       numDiv.style.background = numCircleColor(a);
       numDiv.style.color = '#0f172a';
-      numDiv.textContent = i + 1;
+      numDiv.textContent = offset + i + 1;
       row.appendChild(numDiv);
 
       const nameInput = document.createElement('input');

@@ -313,25 +313,21 @@ function setA(tableId, i, patch) {
 
 // ─── Colors ──────────────────────────────────────────────────────────────────
 function seatFill(a) {
-  if (a.special)        return '#92400e';
   if (a.gender === 'M') return '#1e3a5f';
   if (a.gender === 'K') return '#4a1942';
   return '#1e293b';
 }
 function seatStroke(a) {
-  if (a.special)        return '#f59e0b';
   if (a.gender === 'M') return '#3b82f6';
   if (a.gender === 'K') return '#ec4899';
   return '#475569';
 }
 function seatTextColor(a) {
-  if (a.special)        return '#fbbf24';
   if (a.gender === 'M') return '#93c5fd';
   if (a.gender === 'K') return '#f9a8d4';
   return '#94a3b8';
 }
 function numCircleColor(a) {
-  if (a.special)        return '#fbbf24';
   if (a.gender === 'M') return '#93c5fd';
   if (a.gender === 'K') return '#f9a8d4';
   return '#475569';
@@ -473,6 +469,16 @@ function renderFloor() {
       });
       g.appendChild(sc);
 
+      // Special diet badge (yellow dot, top-right)
+      if (a.special) {
+        const badge = makeSVGEl('circle', {
+          cx: pos.x + SR * 0.65, cy: pos.y - SR * 0.65,
+          r: 5, fill: '#fbbf24', stroke: '#0f172a', 'stroke-width': 1.5,
+          'pointer-events': 'none'
+        });
+        g.appendChild(badge);
+      }
+
       // Seat number
       const hasName = a.name && a.name.trim();
       if (hasName) {
@@ -579,7 +585,7 @@ function renderList() {
       btnM.className = 'toggle-btn' + (a.gender === 'M' ? ' active-m' : '');
       btnM.textContent = 'M';
       btnM.title = 'Man';
-      btnM.addEventListener('click', () => setA(table.id, i, { gender: a.gender === 'M' ? '' : 'M' }));
+      btnM.addEventListener('click', () => { const cur = getA(table.id, i); setA(table.id, i, { gender: cur.gender === 'M' ? '' : 'M' }); });
       row.appendChild(btnM);
 
       // Gender K button
@@ -587,7 +593,7 @@ function renderList() {
       btnK.className = 'toggle-btn' + (a.gender === 'K' ? ' active-k' : '');
       btnK.textContent = 'K';
       btnK.title = 'Kvinna';
-      btnK.addEventListener('click', () => setA(table.id, i, { gender: a.gender === 'K' ? '' : 'K' }));
+      btnK.addEventListener('click', () => { const cur = getA(table.id, i); setA(table.id, i, { gender: cur.gender === 'K' ? '' : 'K' }); });
       row.appendChild(btnK);
 
       // Special diet
@@ -595,7 +601,7 @@ function renderList() {
       btnS.className = 'toggle-btn' + (a.special ? ' active-s' : '');
       btnS.textContent = '★';
       btnS.title = 'Specialkost';
-      btnS.addEventListener('click', () => setA(table.id, i, { special: !a.special }));
+      btnS.addEventListener('click', () => { const cur = getA(table.id, i); setA(table.id, i, { special: !cur.special }); });
       row.appendChild(btnS);
 
       list.appendChild(row);

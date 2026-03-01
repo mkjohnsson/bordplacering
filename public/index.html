@@ -350,16 +350,56 @@ function seatOffset(table) {
 // ─── SVG rendering ───────────────────────────────────────────────────────────
 const SR = 14;  // seat radius (fixed)
 
-// Scale linearly from the original 8-seat size (TR=52, TW=90, TH=60)
+// Round table: same scale as original (TR=52 at n=8)
 function tableRadius(n) {
   return Math.max(22, 6.5 * n);
 }
 
+// Rectangular table: 2:1 aspect, TH matches round diameter at same n
 function tableDims(n) {
-  return {
-    TW: Math.max(45, 11.25 * n),
-    TH: Math.max(30, 7.5 * n),
-  };
+  const TH = Math.max(26, 6.5 * n);
+  return { TW: TH * 2, TH };
+}
+
+// Symmetric rect seat placement: distribute seats per side proportional to
+// side length, then center them with equal margins (real table-setting style)
+function rectSeatPos(table, i, TW, TH) {
+  const n = table.seats;
+  const gap = SR + 4;
+  const ratio = TW / (TW + TH); // long-side fraction of perimeter half
+
+  // Find integer a (per long side) and b (per short side) minimising error
+  const half = Math.floor(n / 2);
+  let a = 0, b = 0, bestErr = Infinity;
+  for (let aa = 0; aa <= half; aa++) {
+    const bb = half - aa;
+    const err = Math.abs(half > 0 ? aa / half - ratio : 0);
+    if (err < bestErr) { bestErr = err; a = aa; b = bb; }
+  }
+
+  // Odd n: one extra seat goes on top (head of table)
+  const topCount    = a + (n % 2);
+  const bottomCount = a;
+  const rightCount  = b;
+  const leftCount   = b;
+
+  // Center k seats symmetrically along a half-edge of length L
+  function edgePos(j, k, L) {
+    return (j + 1) * 2 * L / (k + 1) - L;
+  }
+
+  // Clockwise: top → right → bottom (mirrored) → left (mirrored)
+  let idx = i;
+  if (idx < topCount)
+    return { x: table.x + edgePos(idx, topCount, TW), y: table.y - TH - gap };
+  idx -= topCount;
+  if (idx < rightCount)
+    return { x: table.x + TW + gap, y: table.y + edgePos(idx, rightCount, TH) };
+  idx -= rightCount;
+  if (idx < bottomCount)
+    return { x: table.x + edgePos(bottomCount - 1 - idx, bottomCount, TW), y: table.y + TH + gap };
+  idx -= bottomCount;
+  return { x: table.x - TW - gap, y: table.y + edgePos(leftCount - 1 - idx, leftCount, TH) };
 }
 
 function seatPos(table, i) {
@@ -371,24 +411,7 @@ function seatPos(table, i) {
     return { x: table.x + r * Math.cos(angle), y: table.y + r * Math.sin(angle) };
   } else {
     const { TW, TH } = tableDims(n);
-    const perim = 2 * (2*TW + 2*TH);
-    const t = ((i + 0.5) / n) * perim;
-    const gap = SR + 4;
-    const topLen = 2 * TW, rightLen = 2 * TH, botLen = 2 * TW, leftLen = 2 * TH;
-
-    if (t < topLen) {
-      const frac = t / topLen;
-      return { x: table.x - TW + frac * 2 * TW, y: table.y - TH - gap };
-    } else if (t < topLen + rightLen) {
-      const frac = (t - topLen) / rightLen;
-      return { x: table.x + TW + gap, y: table.y - TH + frac * 2 * TH };
-    } else if (t < topLen + rightLen + botLen) {
-      const frac = (t - topLen - rightLen) / botLen;
-      return { x: table.x + TW - frac * 2 * TW, y: table.y + TH + gap };
-    } else {
-      const frac = (t - topLen - rightLen - botLen) / leftLen;
-      return { x: table.x - TW - gap, y: table.y + TH - frac * 2 * TH };
-    }
+    return rectSeatPos(table, i, TW, TH);
   }
 }
 
